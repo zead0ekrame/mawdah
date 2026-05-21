@@ -1,0 +1,408 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Gender {
+  MALE
+  FEMALE
+}
+
+enum UserStatus {
+  ACTIVE           // نشط — يظهر في النتائج
+  PAUSED           // إيقاف مؤقت — اختيار المستخدم
+  STOPPED          // إيقاف نهائي — اختيار المستخدم
+  UNDER_FOLLOWUP   // قيد المتابعة — بعد التوافق المبدئي
+  BANNED           // محظور — قرار إداري
+}
+
+enum MaritalStatus {
+  SINGLE                   // أعزب
+  DIVORCED                 // مطلق
+  WIDOWED                  // أرمل
+  MARRIED_SEEKING_POLYGAMY // متزوج يطلب التعدد
+}
+
+enum EducationLevel {
+  BELOW_HIGH_SCHOOL // دون ثانوي
+  HIGH_SCHOOL       // ثانوي
+  UNIVERSITY        // جامعي
+  MASTERS           // ماجستير
+  PHD               // دكتوراه
+}
+
+enum HijabType {
+  NIQAB  // منقبة
+  KHIMAR // مختمرة
+  HIJAB  // محجبة
+  NONE   // غير محجبة
+}
+
+enum SkinColor {
+  WHITE // أبيض
+  WHEAT // قمحي
+  BROWN // أسمر
+  DARK  // داكن
+}
+
+enum Governorate {
+  CAIRO        // القاهرة
+  GIZA         // الجيزة
+  ALEXANDRIA   // الإسكندرية
+  ASWAN        // أسوان
+  ASSIUT       // أسيوط
+  BENI_SUEF    // بني سويف
+  PORT_SAID    // بور سعيد
+  DAKAHLIA     // الدقهلية
+  DAMIETTA     // دمياط
+  SUEZ         // السويس
+  SHARQIA      // الشرقية
+  GHARBIA      // الغربية
+  FAIYUM       // الفيوم
+  KAFR_EL_SHEIKH // كفر الشيخ
+  LUXOR        // الأقصر
+  MATRUH       // مطروح
+  MINYA        // المنيا
+  MONUFIA      // المنوفية
+  NEW_VALLEY   // الوادي الجديد
+  NORTH_SINAI  // شمال سيناء
+  QENA         // قنا
+  QALIUBIYA    // القليوبية
+  RED_SEA      // البحر الأحمر
+  SOHAG        // سوهاج
+  SOUTH_SINAI  // جنوب سيناء
+  ISMAILIA     // الإسماعيلية
+  BEHEIRA      // البحيرة
+  OTHER        // دولة أخرى خارج مصر
+}
+
+enum MatchStatus {
+  PENDING_FEMALE       // في انتظار قرار الأنثى
+  PENDING_MALE         // الأنثى وافقت — في انتظار قرار الذكر
+  CHAT_PHASE           // مرحلة المحادثة المفتوحة — بعد قبول الطرفين
+  FULLY_MATCHED        // توافق كامل — تم كشف الأرقام
+  FEMALE_REJECTED      // الأنثى رفضت
+  MALE_REJECTED        // الذكر رفض (الأنثى لا تعلم)
+  UNDER_FOLLOWUP       // قيد المتابعة — بعد التوافق المبدئي
+  COMPLETED_MARRIAGE   // تم الزواج 🎉
+  COMPLETED_NO_MATCH   // انتهى بدون توافق
+}
+
+enum Decision {
+  APPROVED
+  REJECTED
+}
+
+enum RatingType {
+  // مشترك للجنسين
+  INITIAL_MATCH        // تم التوافق مبدئياً ✅
+  RESPECTFUL_NO_MATCH  // محترم/محترمة لكن لم نتوافق 🤝
+  UNFRIENDLY           // غير ودود/غير متجاوبة 😕
+  SLOW_RESPONSE        // يتأخر/تتأخر في الرد ⏰
+  FORMAL_COMPLAINT     // شكوى رسمية 🚨
+  // للأنثى فقط على الذكر
+  NO_CONTACT           // لم يتواصل 😶 (يُتاح بعد 48 ساعة)
+  // للذكر فقط على الأنثى
+  NO_RESPONSE          // لا يوجد رد أبداً 😶 (يُتاح بعد 48 ساعة)
+}
+
+enum ComplaintStatus {
+  PENDING   // قيد المراجعة
+  WARNED    // تم التحذير
+  SUSPENDED // موقوف مؤقتاً
+  BANNED    // محظور نهائياً
+  DISMISSED // تم رفض الشكوى
+}
+
+enum PreferenceTrait {
+  AGE_MIN                    // الحد الأدنى للسن
+  AGE_MAX                    // الحد الأقصى للسن
+  CURRENT_GOVERNORATE        // المحافظة الحالية
+  POST_MARRIAGE_GOVERNORATE  // محافظة السكن بعد الزواج
+  RELIGIOUS_LEVEL_MIN        // حد أدنى لمستوى الالتزام
+  EDUCATION_LEVEL_MIN        // حد أدنى لمستوى التعليم
+  HEIGHT_MIN                 // الحد الأدنى للطول
+  WEIGHT_MIN                 // الحد الأدنى للوزن
+  WEIGHT_MAX                 // الحد الأقصى للوزن
+  SKIN_COLOR                 // لون البشرة المفضّل
+  ACCEPTS_CHILDREN           // يقبل من لديه أبناء
+  ACCEPTS_DIVORCED           // يقبل المطلق/المطلقة
+  ACCEPTS_WIDOWED            // يقبل الأرمل/الأرملة
+  ACCEPTS_POLYGAMY           // تقبل التعدد (للأنثى فقط)
+  HIJAB_TYPE_PREFERENCE      // نوع الحجاب المفضّل (للذكر فقط)
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
+model User {
+  id              String     @id @default(cuid())
+  phone           String     @unique
+  isVerified      Boolean    @default(false)
+  gender          Gender
+  status          UserStatus @default(ACTIVE)
+  reputationScore Int        @default(100) // يتأثر بالتقييمات
+  isAdmin         Boolean    @default(false)
+  adminPassword   String?    // hashed — للأدمن فقط
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+  lastActiveAt    DateTime   @default(now())
+
+  // Relations
+  profile              Profile?
+  preferences          Preference[]
+  matchesAsMale        Match[]     @relation("MaleMatches")
+  matchesAsFemale      Match[]     @relation("FemaleMatches")
+  ratingsGiven         Rating[]    @relation("RaterRatings")
+  ratingsReceived      Rating[]    @relation("RatedRatings")
+  complaintsFiled      Complaint[] @relation("ComplainantComplaints")
+  complaintsReceived   Complaint[] @relation("RespondentComplaints")
+  otpCodes             OtpCode[]
+  botMessages          BotMessage[]
+  followUpLogs         FollowUpLog[]
+  contactRevealLogs    ContactRevealLog[]
+  pushSubscriptions    PushSubscription[]
+  chatMessages         ChatMessage[]
+}
+
+model Profile {
+  id                      String        @id @default(cuid())
+  userId                  String        @unique
+  user                    User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // حقول مشتركة — إجبارية
+  age                     Int
+  currentGovernorate      Governorate
+  postMarriageGovernorate Governorate
+  maritalStatus           MaritalStatus
+  childrenCount           Int?          // للمطلق والأرمل فقط
+  currentWivesCount       Int?          // للمتزوج يطلب التعدد (1-3)
+  religiousLevel          Int           // 1-5
+  educationLevel          EducationLevel
+  heightCategory          String        // مثال: "170-175"
+  weightCategory          String        // مثال: "70-75"
+  skinColor               SkinColor
+  personalMessage         String        @db.Text // الرسالة الشخصية — بلا رقابة
+
+  // حقول الأنثى فقط
+  hijabType               HijabType?
+  guardianPhone           String?       // رقم الولي — لا يُكشف إلا بعد التوافق الكامل
+
+  // درجة اكتمال الملف (محسوبة تلقائياً 0-100)
+  completenessScore       Int           @default(0)
+
+  createdAt               DateTime      @default(now())
+  updatedAt               DateTime      @updatedAt
+
+  @@index([currentGovernorate, age, religiousLevel])
+}
+
+model Preference {
+  id        String          @id @default(cuid())
+  userId    String
+  user      User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  trait     PreferenceTrait
+  value     String          // قيمة الصفة (مخزنة كـ String، تُفسَّر حسب النوع)
+  weight    Int             // 1=يُفضَّل، 2=مهم، 3=مهم جداً، 4=شرط مطلق (Hard Filter)
+
+  createdAt DateTime        @default(now())
+
+  @@unique([userId, trait]) // كل مستخدم له وزن واحد لكل صفة
+}
+
+model Match {
+  id                 String      @id @default(cuid())
+  maleId             String
+  male               User        @relation("MaleMatches", fields: [maleId], references: [id])
+  femaleId           String
+  female             User        @relation("FemaleMatches", fields: [femaleId], references: [id])
+
+  compatibilityScore Float       // نقاط التوافق من الخوارزمية (0-100)
+  status             MatchStatus @default(PENDING_FEMALE)
+
+  // عدد مرات الظهور — عادةً 1، استثنائياً 2
+  appearanceCount    Int         @default(1)
+
+  // قرارات الطرفين
+  femaleDecision     Decision?
+  maleDecision       Decision?
+  femaleDecidedAt    DateTime?
+  maleDecidedAt      DateTime?
+
+  // وقت كشف أرقام الهاتف
+  contactsRevealedAt DateTime?
+
+  // تقييمات ما بعد التواصل
+  femaleRating       Rating?     @relation("FemaleMatchRating")
+  maleRating         Rating?     @relation("MaleMatchRating")
+
+  // متابعة "قيد المتابعة"
+  followUpLogs       FollowUpLog[]
+  contactRevealLogs  ContactRevealLog[]
+
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  // كل زوج لا يظهر لبعض أكثر من مرتين في العمر
+  @@unique([maleId, femaleId])
+  @@index([femaleId, status, femaleDecision, createdAt])
+  @@index([maleId, status, maleDecision, createdAt])
+  @@index([femaleId, appearanceCount])
+  @@index([maleId, appearanceCount])
+
+  chatMessages       ChatMessage[]
+}
+
+model Rating {
+  id         String     @id @default(cuid())
+
+  // الربط بالتوافق
+  femaleMatchId String? @unique
+  femaleMatch   Match?  @relation("FemaleMatchRating", fields: [femaleMatchId], references: [id])
+  maleMatchId   String? @unique
+  maleMatch     Match?  @relation("MaleMatchRating", fields: [maleMatchId], references: [id])
+
+  raterId    String
+  rater      User       @relation("RaterRatings", fields: [raterId], references: [id])
+  ratedId    String
+  rated      User       @relation("RatedRatings", fields: [ratedId], references: [id])
+
+  ratingType RatingType
+
+  // قيود الوقت: بعض التقييمات لا تُتاح إلا بعد مدة
+  // NO_CONTACT / NO_RESPONSE: بعد 48 ساعة من كشف الأرقام
+  // SLOW_RESPONSE: بعد 24 ساعة من كشف الأرقام
+  availableAt DateTime? // وقت إتاحة هذا التقييم
+
+  createdAt  DateTime   @default(now())
+}
+
+model Complaint {
+  id              String          @id @default(cuid())
+  complainantId   String
+  complainant     User            @relation("ComplainantComplaints", fields: [complainantId], references: [id])
+  respondentId    String
+  respondent      User            @relation("RespondentComplaints", fields: [respondentId], references: [id])
+
+  reason          String          @db.Text
+  status          ComplaintStatus @default(PENDING)
+  adminNote       String?
+
+  createdAt       DateTime        @default(now())
+  resolvedAt      DateTime?
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  phone     String
+  code      String   // 6-digit OTP (hashed in production)
+  expiresAt DateTime
+  isUsed    Boolean  @default(false)
+
+  createdAt DateTime @default(now())
+}
+
+// رسائل البوت "مودة" مع كل مستخدم
+model BotMessage {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  isFromBot Boolean  @default(true) // true=رسالة من البوت، false=رسالة من المستخدم
+  messageType String? // "WELCOME" | "MATCH_FOUND" | "RATING_REQUEST" | "FOLLOWUP" | etc.
+
+  createdAt DateTime @default(now())
+}
+
+// الأوزان الديناميكية للخوارزمية — تتحدث تلقائياً بعد كل 50 قرار
+model AlgorithmWeights {
+  id             String   @id @default("singleton") // سجل واحد فقط
+  religious      Float    @default(0.28)
+  geographic     Float    @default(0.22)
+  postMarriage   Float    @default(0.15)
+  family         Float    @default(0.15)
+  education      Float    @default(0.12)
+  physical       Float    @default(0.08)
+  totalDecisions Int      @default(0)   // إجمالي القرارات المُدرَّب عليها
+  lastTrainedAt  DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
+
+// سجل كل تحديث للأوزان — للمراجعة والتتبع
+model WeightUpdateLog {
+  id             String   @id @default(cuid())
+  religious      Float
+  geographic     Float
+  postMarriage   Float
+  family         Float
+  education      Float
+  physical       Float
+  decisionBatch  Int      // عدد القرارات في هذا التحديث
+  trigger        String   // "AUTO_50" | "MANUAL"
+  createdAt      DateTime @default(now())
+}
+
+// سجل متابعة حالة "قيد المتابعة"
+model FollowUpLog {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id])
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  message   String   @db.Text
+  sentAt    DateTime @default(now())
+}
+
+// سجل تدقيقي لكل مرة يتم فيها كشف بيانات تواصل بعد توافق مزدوج
+model ContactRevealLog {
+  id              String   @id @default(cuid())
+  matchId         String
+  match           Match    @relation(fields: [matchId], references: [id])
+  revealedToUserId String
+  revealedToUser   User   @relation(fields: [revealedToUserId], references: [id])
+  revealedPhone   String
+  contactType     String  // "GUARDIAN_PHONE" | "DIRECT_PHONE"
+  reason          String
+  createdAt       DateTime @default(now())
+
+  @@index([matchId])
+  @@index([revealedToUserId])
+}
+
+// اشتراكات إشعارات المتصفح (Web Push)
+model PushSubscription {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  endpoint  String   @unique
+  p256dh    String
+  auth      String
+  createdAt DateTime @default(now())
+}
+
+// نظام المحادثة المباشرة بين التوافقات
+model ChatMessage {
+  id        String   @id @default(cuid())
+  matchId   String
+  match     Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  senderId  String
+  sender    User     @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  content   String   @db.Text
+  isSystem  Boolean  @default(false)
+  isRead    Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([matchId])
+  @@index([senderId])
+}
